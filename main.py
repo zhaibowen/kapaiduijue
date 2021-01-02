@@ -15,20 +15,26 @@ def main():
         curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_RED);
         curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_BLUE)
         curses.init_pair(3, curses.COLOR_WHITE, -1)
+        curses.init_pair(4, curses.COLOR_YELLOW, -1)
 
         red = Player('Red')
         blue = Player('Blue')
-        bm = BattleManager(draw=True)
-        while bm.has_place():
-            bm.draw_board(stdscr, red, blue)
+        bm = BattleManager(stdscr=stdscr, draw=True)
+        while bm.has_place(red, blue):
+            bm.draw_board(red, blue)
             if bm.turn == 0:
-                red.move(bm)
+                hero, posx, posy = red.move(bm)
             else:
-                blue.move(bm)
-            bm.draw_board(stdscr, red, blue)
-            bm.inference(red, blue)
-            bm.draw_board(stdscr, red, blue)
+                hero, posx, posy = blue.move(bm)
+            bm.draw_board(red, blue)
+            if bm.turn == 0:
+                bm.inference(red, blue, hero, posx, posy)
+            else:
+                bm.inference(blue, red, hero, posx, posy)
+            bm.draw_board(red, blue)
             bm.turn_over()
+
+        bm.show_winner()
 
     except Exception as e:
         print(e)

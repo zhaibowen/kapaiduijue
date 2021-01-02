@@ -1,5 +1,7 @@
 #coding=utf-8
+import copy
 import os
+import random
 import sys
 
 class Hero:
@@ -8,10 +10,11 @@ class Hero:
         s.camp = camp
         s.quality = quality
         s.owner = ""
-        s.dimentions = dimentions
         s.green = green
-        s.species = species
-        s.skill = skill
+        s.species = set(species)
+        s.skill = set(skill)
+        s.true_dimentions = copy.copy(dimentions)
+        s.dimentions = [d + random.randint(0, g) for d, g in zip(dimentions, green)]
 
     def attributes(s):
         return "%s, 阵营:%s, 品质:%s, 所属:%s, 四维:%s, 绿点%s, 物种:%s, 技能:%s"%\
@@ -30,8 +33,8 @@ class Hero:
         s.owner = ""
         s.dimentions = [0, 0, 0, 0]
         s.green = [0, 0, 0, 0]
-        s.species = []
-        s.skill = []
+        s.species = set()
+        s.skill = set()
 
 def HeroRegister():
     HerosPool = []
