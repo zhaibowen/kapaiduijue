@@ -9,7 +9,7 @@ from hero import Hero
 from player import Player
 
 class BattleManager:
-    def __init__(s, stdscr):
+    def __init__(s, stdscr, save_record=True):
         s.width = 3
         s.height = 3
         #s.turn = random.randint(0, 1)
@@ -17,6 +17,7 @@ class BattleManager:
         s.board = [[Hero() for j in range(s.height)] for i in range(s.width)]
         s.stdscr = stdscr
         s.order = 0
+        s.save_record = save_record
     
     def get_card_num(s, owner):
         cards_num = 0
@@ -62,8 +63,32 @@ class BattleManager:
                     s.board[posx + x][posy + y].owner == s.board[posx][posy].owner:
                 return True
 
+    def save_record_fun(s, red, blue, cur_hero, posx, posy):
+        if s.order == 1:
+            action = 'w'
+        else:
+            action = 'a'
+        with open("record", action) as f:
+            f.write('order:%d\n'%s.order)
+            for i in range(s.height):
+                for j in range(s.width):
+                    hero = s.board[i][j]
+                    if hero.name:
+                        f.write("board row:%d, col:%d, hero:%s\n"%(i, j, hero.attributes()))
+            for hero in red.card:
+                if hero.name:
+                    f.write("%s row:%d, col:%d, hero:%s\n"%(red.owner, i, j, hero.attributes()))
+            for hero in blue.card:
+                if hero.name:
+                    f.write("%s row:%d, col:%d, hero:%s\n"%(blue.owner, i, j, hero.attributes()))
+            f.write("cur_hero %s, %s, pos:%s-%s\n"%(cur_hero.owner, cur_hero.attributes(), posx, posy))
+            f.write('\n')
+            f.flush()
+
     def inference(s, red, blue, hero, posx, posy, jinchang=True, jinchang_skill=set(),
             targets=[[0, -1, 0, 1, 0], [0, 1, 1, 0, 0], [-1, 0, 2, 3, 0], [1, 0, 3, 2, 0]]):
+        if s.save_record == True:
+            s.save_record_fun(red, blue, hero, posx, posy)
         #s.stdscr.addstr(3, 70, "hero:%s, jinchang:%d, pos:%d-%d"%(hero.name, jinchang, posx, posy))
         #s.stdscr.refresh()
         #s.stdscr.getch()
@@ -140,16 +165,16 @@ class BattleManager:
                     posy, tposy = tposy, posy
                     s.draw_card(hero, posx, posy, refresh=False)
                     s.draw_card(target_hero, tposx, tposy, color_skill=["灵动"])
-                    tmp_res = [[x, y, a, b, 0]]
-                    s.inference(blue, red, target_hero, tposx, tposy, jinchang=False, targets=tmp_res)
-                    jinchang_flip = tmp_res[0][4]
+                    tmp_targets=[[0, -1, 0, 1, 0], [0, 1, 1, 0, 0], [-1, 0, 2, 3, 0], [1, 0, 3, 2, 0]]
+                    s.inference(blue, red, target_hero, tposx, tposy, jinchang=False, targets=tmp_targets)
+                    jinchang_flip = tmp_targets[ind][4]
                     break
 
             if "侵扰3" in hero.skill:
                 valid_ind = blue.get_valid_card_index()
                 random.shuffle(valid_ind)
                 for ind in valid_ind[:3]:
-                    s.draw_card(blue.card[ind], ind, -1, hightlight_dim=True, refresh=False, Type=blue.owner)
+                    s.draw_card(blue.card[ind], ind, -1, hightlight_dim=True, refresh=False, Type="Hand")
                     sumd = 0
                     for i in range(4):
                         blue.card[ind].dimentions[i] = max(0, blue.card[ind].dimentions[i] - 1)
@@ -158,8 +183,9 @@ class BattleManager:
                         blue.card[ind].clear()
                 s.draw_card(hero, posx, posy, color_skill=["侵扰3"])
                 for ind in valid_ind[:3]:
-                    s.draw_card(blue.card[ind], ind, -1, hightlight_dim=True, refresh=False, Type=blue.owner)
-                s.draw_card(hero, posx, posy, color_skill=["侵扰3"])
+                    s.draw_card(blue.card[ind], ind, -1, hightlight_dim=True, refresh=False, Type="Hand")
+                hero.skill.remove("侵扰3")
+                s.draw_card(hero, posx, posy)
 
             if "探索1" in hero.skill:
                 s.draw_card(hero, posx, posy, color_skill=["探索1"])
@@ -177,7 +203,7 @@ class BattleManager:
                         red.pool[pool_ind], red.card[card_ind] = red.card[card_ind], red.pool[pool_ind]
                         red.pool.pop(pool_ind)
                         hero.skill.remove("探索1")
-                        s.draw_card(red.card[card_ind], 4 + card_ind * 7, 15 if hero.owner == "Red" else 175)
+                        s.draw_card(red.card[card_ind], card_ind, -1, Type="Hand")
 
         for ind, (x, y, a, b, f) in enumerate(targets):
             if hero.name == "" or jinchang_flip:
@@ -307,11 +333,11 @@ class BattleManager:
         
         for i in range(5):
             if red.card[i].name:
-                s.draw_card(red.card[i], i, -1, refresh=False, Type="Red")
+                s.draw_card(red.card[i], i, -1, refresh=False, Type="Hand")
 
         for i in range(5):
             if blue.card[i].name:
-                s.draw_card(blue.card[i], i, -1, refresh=False, Type="Blue")
+                s.draw_card(blue.card[i], i, -1, refresh=False, Type="Hand")
         
         for i in range(3):
             for j in range(3):
@@ -327,10 +353,11 @@ class BattleManager:
             return
         if Type == "Grid":
             posx, posy = 10 + 10 * x, 63 + 30 * y
-        elif Type == "Red":
-            posx, posy = 4 + x * 7, 15
-        else:
-            posx, posy = 4 + x * 7, 175
+        elif Type == "Hand":
+            if h.owner == "Red":
+                posx, posy = 4 + x * 7, 15
+            else:
+                posx, posy = 4 + x * 7, 175
 
         s.stdscr.attron(curses.color_pair(3))
         for i in range(5):

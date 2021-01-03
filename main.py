@@ -24,9 +24,9 @@ def main():
         while bm.has_place(red, blue):
             bm.draw_board(red, blue)
             if bm.turn == 0:
-                hero, posx, posy = red.move(bm)
+                hero, posx, posy = red.move(bm, blue)
             else:
-                hero, posx, posy = blue.move(bm)
+                hero, posx, posy = blue.move(bm, red)
             bm.preprocess_board()
             bm.draw_board(red, blue)
             if bm.turn == 0:
