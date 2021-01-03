@@ -1,4 +1,5 @@
 #coding=utf-8
+import copy
 import curses
 import os
 import random
@@ -8,16 +9,21 @@ from hero import Hero
 from player import Player
 
 class BattleManager:
-    def __init__(s, stdscr, draw=True):
+    def __init__(s, stdscr):
         s.width = 3
         s.height = 3
         #s.turn = random.randint(0, 1)
         s.turn = 0
         s.board = [[Hero() for j in range(s.height)] for i in range(s.width)]
-        s.total_grid = s.width * s.height
-        s.draw = draw
         s.stdscr = stdscr
+        s.order = 0
     
+    def get_card_num(s, owner):
+        cards_num = 0
+        for i in range(s.width):
+            cards_num += len(list(filter(lambda x: x.owner == owner, s.board[i])))
+        return cards_num
+
     def has_place(s, red, blue):
         sumv = 0
         for i in range(s.width):
@@ -29,69 +35,122 @@ class BattleManager:
     def turn_over(s):
         s.turn ^= 1
 
-    def inference(s, red, blue, hero, posx, posy):
+    def get_ordered_hero_on_board(s):
+        ordered_hero = []
+        for i in range(s.width):
+            for j in range(s.height):
+                if s.board[i][j].name:
+                    tmp_order = s.board[i][j].order
+                    if tmp_order == s.order:
+                        tmp_order = -1
+                    ordered_hero.append([i, j, tmp_order])
+        ordered_hero.sort(key=lambda x: x[2])
+        return ordered_hero
+
+    def preprocess_board(s):
+        for i in range(s.width):
+            for j in range(s.height):
+                s.board[i][j].try_flip_num = 0
+        s.initial_board = copy.deepcopy(s.board)
+
+    def friend_surround(posx, posy):
+        for x, y in [[0, -1], [0, 1], [-1, 0], [1, 0]]:
+            if 0 <= posx + x and posx + x < s.height and \
+                    0 <= posy + y and posy + y < s.width and \
+                    s.board[posx + x][posy + y].name and \
+                    s.board[posx + x][posy + y].owner == s.board[posx][posy].owner:
+                return True
+
+    def inference(s, red, blue, hero, posx, posy, jinchang=True, jinchang_skill=set()):
         targets = [[0, -1, 0, 1, 0], [0, 1, 1, 0, 0], [-1, 0, 2, 3, 0], [1, 0, 3, 2, 0]]
-        caidingji = set(["警戒", "惊骇1", "探索1"])
-        # 进场后
-        # 优先级：惊骇1-1，警戒-3，探索1-5
-        for ind, (x, y, a, b, f) in enumerate(targets):
-            if 0 <= posx + x and posx + x < s.height and \
-                    0 <= posy + y and posy + y < s.width and \
-                    s.board[posx + x][posy + y].name and \
-                    "惊骇1" in s.board[posx + x][posy + y].skill and \
-                    s.board[posx + x][posy + y].owner != s.board[posx][posy].owner:
-                sumd = 0
-                for i in range(4):
-                    s.board[posx][posy].dimentions[i] = max(0, s.board[posx][posy].dimentions[i] - 1)
-                    sumd += s.board[posx][posy].dimentions[i]
-                s.draw_card(s.board[posx + x][posy + y], posx + x, posy + y, color_skill=["惊骇1"]);
-                s.draw_card(s.board[posx][posy], posx, posy, hightlight_dim=True);
-                if sumd == 0:
-                    s.board[posx][posy].clear()
-                    s.draw_card(s.board[posx][posy], posx, posy)
-                    return
+        caidingji = set(["警戒", "惊骇1", "探索1", "护卫", "帷幕"])
+        jinchang_flip = False
+        if jinchang == True:
+            # 进场后
+            # 优先级：惊骇1-1，烈焰-3，警戒-3，探索1-5
+            for ind, (x, y, a, b, f) in enumerate(targets):
+                if 0 <= posx + x and posx + x < s.height and \
+                        0 <= posy + y and posy + y < s.width and \
+                        s.board[posx + x][posy + y].name and \
+                        "惊骇1" in s.board[posx + x][posy + y].skill and \
+                        s.board[posx + x][posy + y].owner != s.board[posx][posy].owner:
+                    sumd = 0
+                    for i in range(4):
+                        s.board[posx][posy].dimentions[i] = max(0, s.board[posx][posy].dimentions[i] - 1)
+                        sumd += s.board[posx][posy].dimentions[i]
+                    s.draw_card(s.board[posx + x][posy + y], posx + x, posy + y, color_skill=["惊骇1"])
+                    s.draw_card(s.board[posx][posy], posx, posy, hightlight_dim=True)
+                    if sumd == 0:
+                        s.board[posx][posy].clear()
+                        s.draw_card(s.board[posx][posy], posx, posy)
+                        return
+
+            for ind, (x, y, a, b, f) in enumerate(targets):
+                if 0 <= posx + x and posx + x < s.height and \
+                        0 <= posy + y and posy + y < s.width and \
+                        s.board[posx + x][posy + y].name and \
+                        "烈焰1" in s.board[posx][posy].skill and \
+                        s.board[posx + x][posy + y].owner != s.board[posx][posy].owner:
+                    sumd = 0
+                    for i in range(4):
+                        s.board[posx + x][posy + y].dimentions[i] = max(0, s.board[posx + x][posy + y].dimentions[i] - 1)
+                        sumd += s.board[posx + x][posy + y].dimentions[i]
+                    s.draw_card(s.board[posx][posy], posx, posy, color_skill=["烈焰1"])
+                    s.draw_card(s.board[posx + x][posy + y], posx + x, posy + y, hightlight_dim=True)
+                    if sumd == 0:
+                        s.board[posx + x][posy + y].clear()
+                        s.draw_card(s.board[posx + x][posy + y], posx + x, posy + y)
+            if "烈焰1" in s.board[posx][posy].skill:
+                hero.skill.remove("烈焰1")
+                s.draw_card(s.board[posx][posy], posx, posy)
+
+            for ind, (x, y, a, b, f) in enumerate(targets):
+                if jinchang_flip:
+                    break
+                if 0 <= posx + x and posx + x < s.height and \
+                        0 <= posy + y and posy + y < s.width and \
+                        s.board[posx + x][posy + y].name and \
+                        "警戒" in s.board[posx + x][posy + y].skill and \
+                        s.board[posx + x][posy + y].owner != s.board[posx][posy].owner and \
+                        s.board[posx][posy].dimentions[a] < s.board[posx + x][posy + y].dimentions[b]:
+                    tposx, tposy = posx + x, posy + y
+                    target_hero = s.board[tposx][tposy]
+                    s.draw_card(target_hero, tposx, tposy, color_skill=["警戒"]);
+                    if "坚韧1" in hero.skill:
+                        s.draw_card(hero, posx, posy, color_skill=["坚韧1"]);
+                        hero.skill.remove("坚韧1")
+                        s.draw_card(hero, posx, posy);
+                    elif "损毁" in hero.skill:
+                        s.draw_card(hero, posx, posy, color_skill=["损毁"]);
+                        hero.clear()
+                        s.draw_card(hero, posx, posy);
+                    else:
+                        s.board[posx][posy].owner = s.board[posx + x][posy + y].owner
+                        s.board[posx][posy].skill -= caidingji
+                        s.draw_card(hero, posx, posy);
+                        jinchang_flip = True
+
+            if "探索1" in hero.skill:
+                s.draw_card(hero, posx, posy, color_skill=["探索1"]);
+                if red.valid() < 5:
+                    quality = hero.quality
+                    valid_pool = list(filter(lambda x: x.quality <= quality + 1, red.pool))
+                    if valid_pool:
+                        target_hero = random.choice(valid_pool)
+                        for pool_ind, h in enumerate(red.pool):
+                            if h.name == target_hero.name:
+                                break
+                        for card_ind, h in enumerate(red.card):
+                            if h.name == "":
+                                break
+                        red.pool[pool_ind], red.card[card_ind] = red.card[card_ind], red.pool[pool_ind]
+                        red.pool.pop(pool_ind)
+                        hero.skill.remove("探索1")
+                        s.draw_card(red.card[card_ind], 4 + card_ind * 7, 15 if hero.owner == "Red" else 175)
 
         for ind, (x, y, a, b, f) in enumerate(targets):
-            if 0 <= posx + x and posx + x < s.height and \
-                    0 <= posy + y and posy + y < s.width and \
-                    s.board[posx + x][posy + y].name and \
-                    "警戒" in s.board[posx + x][posy + y].skill and \
-                    s.board[posx + x][posy + y].owner != s.board[posx][posy].owner and \
-                    s.board[posx][posy].dimentions[a] < s.board[posx + x][posy + y].dimentions[b]:
-                tposx, tposy = posx + x, posy + y
-                target_hero = s.board[tposx][tposy]
-                s.draw_card(target_hero, tposx, tposy, color_skill=["警戒"]);
-                if "坚韧1" in hero.skill:
-                    s.draw_card(hero, posx, posy, color_skill=["坚韧1"]);
-                    hero.skill.remove("坚韧1")
-                elif "损毁" in hero.skill:
-                    s.draw_card(hero, posx, posy, color_skill=["损毁"]);
-                    hero.clear()
-                else:
-                    s.board[posx][posy].owner = s.board[posx + x][posy + y].owner
-                    s.board[posx][posy].skill -= caidingji
-                s.draw_card(hero, posx, posy);
-                return
-
-        if "探索1" in hero.skill:
-            s.draw_card(hero, posx, posy, color_skill=["探索1"]);
-            if red.valid() < 5:
-                quality = hero.quality
-                valid_pool = list(filter(lambda x: x.quality <= quality + 1, red.pool))
-                if valid_pool:
-                    target_hero = random.choice(valid_pool)
-                    for pool_ind, h in enumerate(red.pool):
-                        if h.name == target_hero.name:
-                            break
-                    for card_ind, h in enumerate(red.card):
-                        if h.name == "":
-                            break
-                    red.pool[pool_ind], red.card[card_ind] = red.card[card_ind], red.pool[pool_ind]
-                    red.pool.pop(pool_ind)
-                    hero.skill.remove("探索1")
-                    s.draw_card(red.card[card_ind], 4 + card_ind * 7, 15 if hero.owner == "Red" else 175)
-
-        for ind, (x, y, a, b, f) in enumerate(targets):
+            if hero.name == "" or jinchang_flip:
+                break
             tposx, tposy = -1, -1
             # 寻找攻击目标时
             # 优先级：洞穿-4，箭矢-5
@@ -99,9 +158,14 @@ class BattleManager:
                     0 <= posy + y and posy + y < s.width and \
                     s.board[posx + x][posy + y].name and \
                     s.board[posx + x][posy + y].owner != s.board[posx][posy].owner:
-                tposx, tposy = posx + x, posy + y
+                if "护卫" in jinchang_skill:
+                    if s.initial_board[posx + x][posy + y].order == s.board[posx + x][posy + y].order and \
+                            s.initial_board[posx + x][posy + y].owner != s.board[posx + x][posy + y].owner:
+                        tposx, tposy = posx + x, posy + y
+                else:
+                    tposx, tposy = posx + x, posy + y
             
-            if "箭矢" in hero.skill:
+            if "护卫" not in jinchang_skill and "箭矢" in hero.skill:
                 if 0 <= posx + 2 * x and posx + 2 * x < s.height and \
                         0 <= posy + 2 * y and posy + 2 * y < s.width and \
                         (s.board[posx + x][posy + y].name == "" or \
@@ -115,7 +179,12 @@ class BattleManager:
             target_hero = s.board[tposx][tposy]
             if hero.dimentions[a] > target_hero.dimentions[b] or \
                     ("洞穿" in hero.skill and hero.dimentions[a] > min(target_hero.dimentions)):
-                s.draw_card(hero, posx, posy, color_skill=["洞穿", "箭矢"]);
+                color_skill = ["洞穿"]
+                if "护卫" in jinchang_skill:
+                    color_skill.append("护卫")
+                else:
+                    color_skill.append("箭矢")
+                s.draw_card(hero, posx, posy, color_skill=color_skill);
                 # 进攻后
                 # 优先级：吞食-5
                 if "吞食" in hero.skill:
@@ -123,14 +192,16 @@ class BattleManager:
                     target_hero.clear()
                     s.draw_card(target_hero, tposx, tposy);
                 # 翻面前
-                # 优先级：坚韧1-5，损毁-6
+                # 优先级：帷幕-3，坚韧1-5，损毁-6
+                elif "帷幕" in target_hero.skill and friend_surround(tposx, tposy) and target_hero.try_flip_num == 0:
+                    s.draw_card(target_hero, tposx, tposy, color_skill=["帷幕"]);
+                    target_hero.try_flip_num = 1
                 elif "坚韧1" in target_hero.skill:
                     s.draw_card(target_hero, tposx, tposy, color_skill=["坚韧1"]);
                     target_hero.skill.remove("坚韧1")
                 elif "损毁" in target_hero.skill:
                     s.draw_card(target_hero, tposx, tposy, color_skill=["损毁"]);
                     target_hero.clear()
-                    s.draw_card(target_hero, tposx, tposy);
                 else:
                     target_hero.owner = hero.owner
                     target_hero.skill -= caidingji
@@ -138,22 +209,23 @@ class BattleManager:
                 s.draw_card(target_hero, tposx, tposy);
 
         # 翻面后
-        # 优先级：践踏-6
-        if "践踏" in hero.skill:
+        # 优先级：践踏-6，护卫-10
+        if not jinchang_flip and "践踏" in hero.skill:
             s.draw_card(hero, posx, posy, color_skill=["践踏"]);
-            s.stdscr.refresh()
-            s.stdscr.getch()
             for x, y, a, b, f in targets:
                 if f:
-                    s.inference(red, blue, s.board[posx + x][posy + y], posx + x, posy + y)
+                    s.inference(red, blue, s.board[posx + x][posy + y], posx + x, posy + y, jinchang=False, jinchang_skill=jinchang_skill)
         
-    def get_card_num(s, owner):
-        cards_num = 0
-        for i in range(s.width):
-            cards_num += len(list(filter(lambda x: x.owner == owner, s.board[i])))
-        return cards_num
+        if "护卫" not in jinchang_skill:
+            ordered_hero = s.get_ordered_hero_on_board()
+            for i, j, order in ordered_hero:
+                if "护卫" in s.board[i][j].skill:
+                    s.inference(red, blue, s.board[i][j], i, j, jinchang=False, jinchang_skill=jinchang_skill|set(["护卫"]))
 
+        
     def show_winner(s):
+        if s.stdscr == False:
+            return
         s.stdscr.attron(curses.A_BOLD)
         red_cards_num = s.get_card_num("Red")
         blue_cards_num = s.get_card_num("Blue")
@@ -171,7 +243,7 @@ class BattleManager:
         s.stdscr.getch()
 
     def draw_board(s, red, blue):
-        if s.draw == False:
+        if s.stdscr == False:
             return
         rows, cols = s.stdscr.getmaxyx()
         s.stdscr.attron(curses.color_pair(3))
@@ -214,6 +286,8 @@ class BattleManager:
         s.stdscr.getch()
 
     def draw_card(s, h, x, y, color_skill=[], hightlight_dim=False, refresh=True, Type="Grid"):
+        if s.stdscr == False:
+            return
         if Type == "Grid":
             posx, posy = 10 + 10 * x, 63 + 30 * y
         elif Type == "Red":

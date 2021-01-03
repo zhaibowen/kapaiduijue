@@ -10,6 +10,8 @@ class Hero:
         s.camp = camp
         s.quality = quality
         s.owner = ""
+        s.order = -1
+        s.try_flip_num = 0
         s.green = green
         s.species = set(species)
         s.skill = set(skill)
@@ -31,6 +33,8 @@ class Hero:
         s.camp = ""
         s.quality = 0
         s.owner = ""
+        s.order = -1
+        s.try_flip_num = 0
         s.dimentions = [0, 0, 0, 0]
         s.green = [0, 0, 0, 0]
         s.species = set()

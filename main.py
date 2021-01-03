@@ -19,13 +19,15 @@ def main():
 
         red = Player('Red')
         blue = Player('Blue')
-        bm = BattleManager(stdscr=stdscr, draw=True)
+        #bm = BattleManager(stdscr=False)
+        bm = BattleManager(stdscr=stdscr)
         while bm.has_place(red, blue):
             bm.draw_board(red, blue)
             if bm.turn == 0:
                 hero, posx, posy = red.move(bm)
             else:
                 hero, posx, posy = blue.move(bm)
+            bm.preprocess_board()
             bm.draw_board(red, blue)
             if bm.turn == 0:
                 bm.inference(red, blue, hero, posx, posy)
