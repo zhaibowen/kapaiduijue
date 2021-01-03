@@ -9,7 +9,7 @@ from hero import Hero
 from player import Player
 
 class BattleManager:
-    def __init__(s, stdscr, save_record=True):
+    def __init__(s, stdscr, save_record=0):
         s.width = 3
         s.height = 3
         #s.turn = random.randint(0, 1)
@@ -17,8 +17,56 @@ class BattleManager:
         s.board = [[Hero() for j in range(s.height)] for i in range(s.width)]
         s.stdscr = stdscr
         s.order = 0
-        s.save_record = save_record
+        s.save_record = save_record # 0 不保存, 1 保存, 2 回放
+        if save_record == 2:
+            red = Player("Red")
+            blue = Player("Blue")
+            with open("record", 'r') as f:
+                x = f.readlines()
+                epoch = []
+                red.card = [Hero() for i in range(5)]
+                blue.card = [Hero() for i in range(5)]
+                s.board = [[Hero() for j in range(s.height)] for i in range(s.width)]
+                for line in x:
+                    if len(line) == 1:
+                        s.order = int(epoch[0][6:])
+                        board_line = list(filter(lambda x: 'board' in x, epoch))
+                        for rl in board_line:
+                            row = int(rl.split('row:')[1].split(',')[0])
+                            col = int(rl.split('col:')[1].split(',')[0])
+                            owner = rl.split('owner:')[1].split(',')[0]
+                            s.board[row][col] = s.extract_hero(rl)
+                            s.board[row][col].owner = owner
+                        blue_line = list(filter(lambda x: 'card owner:Blue' in x, epoch))
+                        for i, rl in enumerate(blue_line):
+                            blue.card[i] = s.extract_hero(rl)
+                            blue.card[i].owner = "Blue"
+                        red_line = list(filter(lambda x: 'card owner:Red' in x, epoch))
+                        for i, rl in enumerate(red_line):
+                            red.card[i] = s.extract_hero(rl)
+                            red.card[i].owner = "Red"
+                        s.draw_board(red, blue)
+                        epoch = []
+                        red.card = [Hero() for i in range(5)]
+                        blue.card = [Hero() for i in range(5)]
+                        s.board = [[Hero() for j in range(s.height)] for i in range(s.width)]
+                    else:
+                        epoch.append(line)
+            exit()
     
+    def extract_hero(s, rl):
+        name = rl.split('hero:')[1].split(',')[0]
+        camp = rl.split('阵营:')[1].split(',')[0]
+        quality = int(rl.split('品质:')[1].split(',')[0])
+        dimentions = rl.split('四维:')[1].split(',')[0].split('-')
+        dimentions = list(map(lambda x: int(x[1:]), dimentions))
+        #green = rl.split('绿点:')[1].split(',')[0].split('-')
+        #green = list(map(lambda x: int(x[1:]), green))
+        green = [0, 0, 0, 0]
+        species = rl.split('物种:')[1].split(',')[0].split('-')
+        skill = rl.strip().split('技能:')[1].split(',')[0].split('-')
+        return Hero(name, camp, quality, dimentions, green, species, skill)
+
     def get_card_num(s, owner):
         cards_num = 0
         for i in range(s.width):
@@ -64,7 +112,7 @@ class BattleManager:
                 return True
 
     def save_record_fun(s, red, blue, cur_hero, posx, posy):
-        if s.order == 1:
+        if s.order == 0:
             action = 'w'
         else:
             action = 'a'
@@ -74,21 +122,33 @@ class BattleManager:
                 for j in range(s.width):
                     hero = s.board[i][j]
                     if hero.name:
-                        f.write("board row:%d, col:%d, hero:%s\n"%(i, j, hero.attributes()))
+                        f.write("board row:%d, col:%d, owner:%s, hero:%s\n"%(i, j, hero.owner, hero.attributes()))
             for hero in red.card:
                 if hero.name:
-                    f.write("%s row:%d, col:%d, hero:%s\n"%(red.owner, i, j, hero.attributes()))
+                    f.write("card owner:%s, hero:%s\n"%(hero.owner, hero.attributes()))
             for hero in blue.card:
                 if hero.name:
-                    f.write("%s row:%d, col:%d, hero:%s\n"%(blue.owner, i, j, hero.attributes()))
-            f.write("cur_hero %s, %s, pos:%s-%s\n"%(cur_hero.owner, cur_hero.attributes(), posx, posy))
+                    f.write("card owner:%s, hero:%s\n"%(hero.owner, hero.attributes()))
+            f.write("current row:%s, col:%s, owner:%s, hero:%s\n"%(posx, posy, cur_hero.owner, cur_hero.attributes()))
             f.write('\n')
             f.flush()
 
-    def inference(s, red, blue, hero, posx, posy, jinchang=True, jinchang_skill=set(),
+    def inference(s, red, blue, hero, posx, posy, jinchang=True, card_pos=-1, jinchang_skill=set(),
             targets=[[0, -1, 0, 1, 0], [0, 1, 1, 0, 0], [-1, 0, 2, 3, 0], [1, 0, 3, 2, 0]]):
-        if s.save_record == True:
+        if s.save_record == 1:
             s.save_record_fun(red, blue, hero, posx, posy)
+        
+        # 进场
+        if jinchang == True:
+            s.board[posx][posy], red.card[card_pos] = red.card[card_pos], s.board[posx][posy]
+            s.board[posx][posy].owner = red.owner
+            s.board[posx][posy].order = s.order
+            s.order += 1
+            if red.owner == "Red":
+                s.draw_board(red, blue)
+            else:
+                s.draw_board(blue, red)
+
         #s.stdscr.addstr(3, 70, "hero:%s, jinchang:%d, pos:%d-%d"%(hero.name, jinchang, posx, posy))
         #s.stdscr.refresh()
         #s.stdscr.getch()

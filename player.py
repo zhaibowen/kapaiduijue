@@ -69,13 +69,10 @@ class Player:
             ind += 1
             ind %= bm.width * bm.height
         
+        card_pos = pos % 5
         bm_curx = ind // bm.height
         bm_cury = ind % bm.height
-        bm.board[bm_curx][bm_cury], self.card[pos % 5] = self.card[pos % 5], bm.board[bm_curx][bm_cury]
-        bm.board[bm_curx][bm_cury].owner = self.owner
-        bm.board[bm_curx][bm_cury].order = bm.order
-        bm.order += 1
-        return bm.board[bm_curx][bm_cury], bm_curx, bm_cury
+        return self.card[card_pos], card_pos, bm_curx, bm_cury
 
 if __name__ == "__main__":
     x = Player()
