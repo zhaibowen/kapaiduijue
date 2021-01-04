@@ -111,7 +111,7 @@ class BattleManager:
                     s.board[posx + x][posy + y].owner == s.board[posx][posy].owner:
                 return True
 
-    def save_record_fun(s, red, blue, cur_hero, posx, posy):
+    def save_record_fun(s, red, blue, cur_hero, posx, posy, targets, jinchang, jinchang_skill):
         if s.order == 0:
             action = 'w'
         else:
@@ -130,13 +130,23 @@ class BattleManager:
                 if hero.name:
                     f.write("card owner:%s, hero:%s\n"%(hero.owner, hero.attributes()))
             f.write("current row:%s, col:%s, owner:%s, hero:%s\n"%(posx, posy, cur_hero.owner, cur_hero.attributes()))
+            x = ""
+            for item in targets:
+                x += '\t'.join(list(map(str, item)))+'|'
+            f.write("targets:%s\n"%x)
+            f.write("jinchang:%d\n"%jinchang)
+            f.write("jinchang_skill:%s\n"%('\t'.join(jinchang_skill)))
             f.write('\n')
             f.flush()
 
-    def inference(s, red, blue, hero, posx, posy, jinchang=True, card_pos=-1, jinchang_skill=set(),
-            targets=[[0, -1, 0, 1, 0], [0, 1, 1, 0, 0], [-1, 0, 2, 3, 0], [1, 0, 3, 2, 0]]):
+    def inference(s, red, blue, hero, posx, posy, jinchang=True, card_pos=-1, jinchang_skill=set(), assign_targets=[]):
+        targets = [[0, -1, 0, 1, 0], [0, 1, 1, 0, 0], [-1, 0, 2, 3, 0], [1, 0, 3, 2, 0]]
+        if assign_targets:
+            targets = assign_targets
+        if hero.name == "":
+            return
         if s.save_record == 1:
-            s.save_record_fun(red, blue, hero, posx, posy)
+            s.save_record_fun(red, blue, hero, posx, posy, targets, jinchang, jinchang_skill)
         
         # 进场
         if jinchang == True:
@@ -148,6 +158,7 @@ class BattleManager:
                 s.draw_board(red, blue)
             else:
                 s.draw_board(blue, red)
+            s.preprocess_board()
 
         #s.stdscr.addstr(3, 70, "hero:%s, jinchang:%d, pos:%d-%d"%(hero.name, jinchang, posx, posy))
         #s.stdscr.refresh()
@@ -206,7 +217,7 @@ class BattleManager:
                     target_hero = s.board[tposx][tposy]
                     s.draw_card(target_hero, tposx, tposy, color_skill=["警戒"]);
                     tmp_res = [[-x, -y, b, a, 0]]
-                    s.inference(blue, red, target_hero, tposx, tposy, jinchang=False, targets=tmp_res)
+                    s.inference(blue, red, target_hero, tposx, tposy, jinchang=False, assign_targets=tmp_res)
                     jinchang_flip = tmp_res[0][4]
 
             for ind, (x, y, a, b, f) in enumerate(targets):
@@ -226,7 +237,7 @@ class BattleManager:
                     s.draw_card(hero, posx, posy, refresh=False)
                     s.draw_card(target_hero, tposx, tposy, color_skill=["灵动"])
                     tmp_targets=[[0, -1, 0, 1, 0], [0, 1, 1, 0, 0], [-1, 0, 2, 3, 0], [1, 0, 3, 2, 0]]
-                    s.inference(blue, red, target_hero, tposx, tposy, jinchang=False, targets=tmp_targets)
+                    s.inference(blue, red, target_hero, tposx, tposy, jinchang=False, assign_targets=tmp_targets)
                     jinchang_flip = tmp_targets[ind][4]
                     break
 

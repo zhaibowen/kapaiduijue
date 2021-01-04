@@ -3,6 +3,7 @@ import curses
 import os
 import random
 import sys
+import traceback
 import time
 from player import Player
 from battle_manager import BattleManager
@@ -18,20 +19,22 @@ def main():
         curses.init_pair(4, curses.COLOR_YELLOW, -1)
 
         for epoch in range(10000):
+            if epoch % 1000 == 0:
+                print(epoch)
             red = Player('Red')
             blue = Player('Blue')
-            #bm = BattleManager(stdscr=False, save_record=1)
-            bm = BattleManager(stdscr=stdscr, save_record=2)
+            #print(epoch)
+            #print(red.card[0].name)
+            #print(blue.card[0].name)
+            bm = BattleManager(stdscr=False, save_record=1)
+            #bm = BattleManager(stdscr=stdscr, save_record=1)
             while bm.has_place(red, blue):
                 bm.draw_board(red, blue)
                 if bm.turn == 0:
                     hero, card_pos, posx, posy = red.move(bm, blue)
-                else:
-                    hero, card_pos, posx, posy = blue.move(bm, red)
-                bm.preprocess_board()
-                if bm.turn == 0:
                     bm.inference(red, blue, hero, posx, posy, card_pos=card_pos)
                 else:
+                    hero, card_pos, posx, posy = blue.move(bm, red)
                     bm.inference(blue, red, hero, posx, posy, card_pos=card_pos)
                 bm.draw_board(red, blue)
                 bm.turn_over()
@@ -39,7 +42,7 @@ def main():
             bm.show_winner()
 
     except Exception as e:
-        print(e)
+        traceback.print_exc()
     finally:
         curses.endwin()
 

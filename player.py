@@ -60,6 +60,9 @@ class Player:
         #ind = seq[pos]
         #self.play_nums += 1
 
+        if self.valid() == 0:
+            return self.card[0], 0, 0, 0
+
         pos = random.randint(0, 4)
         while self.card[pos % 5].name == "":
             pos += 1
