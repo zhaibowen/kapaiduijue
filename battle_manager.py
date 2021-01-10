@@ -12,8 +12,8 @@ class BattleManager:
     def __init__(s, stdscr, save_record=0):
         s.width = 3
         s.height = 3
-        #s.turn = random.randint(0, 1)
-        s.turn = 0
+        s.turn = random.randint(0, 1)
+        #s.turn = 0
         s.board = [[Hero() for j in range(s.height)] for i in range(s.width)]
         s.stdscr = stdscr
         s.order = 0
@@ -100,7 +100,8 @@ class BattleManager:
         s.order_owner = {}
         for i in range(s.width):
             for j in range(s.height):
-                s.board[i][j].try_flip_num = 0
+                for k in s.board[i][j].skill.keys():
+                    s.board[i][j].skill[k] = 0
                 s.order_owner[s.board[i][j].order] = s.board[i][j].owner
 
     def friend_surround(s, posx, posy):
@@ -111,7 +112,7 @@ class BattleManager:
                     s.board[posx + x][posy + y].owner == s.board[posx][posy].owner:
                 return True
 
-    def save_record_fun(s, red, blue, cur_hero, posx, posy, targets, jinchang, jinchang_skill):
+    def save_record_fun(s, red, blue, cur_hero, posx, posy, targets, jinchang):
         if s.order == 0:
             action = 'w'
         else:
@@ -135,18 +136,17 @@ class BattleManager:
                 x += '\t'.join(list(map(str, item)))+'|'
             f.write("targets:%s\n"%x)
             f.write("jinchang:%d\n"%jinchang)
-            f.write("jinchang_skill:%s\n"%('\t'.join(jinchang_skill)))
             f.write('\n')
             f.flush()
 
-    def inference(s, red, blue, hero, posx, posy, jinchang=True, card_pos=-1, jinchang_skill=set(), assign_targets=[]):
+    def inference(s, red, blue, hero, posx, posy, jinchang=True, card_pos=-1, assign_targets=[], turn_over=False):
         targets = [[0, -1, 0, 1, 0], [0, 1, 1, 0, 0], [-1, 0, 2, 3, 0], [1, 0, 3, 2, 0]]
         if assign_targets:
             targets = assign_targets
         if hero.name == "":
             return
         if s.save_record == 1:
-            s.save_record_fun(red, blue, hero, posx, posy, targets, jinchang, jinchang_skill)
+            s.save_record_fun(red, blue, hero, posx, posy, targets, jinchang)
         
         # 进场
         if jinchang == True:
@@ -201,7 +201,7 @@ class BattleManager:
                         s.board[posx + x][posy + y].clear()
                         s.draw_card(s.board[posx + x][posy + y], posx + x, posy + y)
             if "烈焰1" in s.board[posx][posy].skill:
-                hero.skill.remove("烈焰1")
+                hero.skill.pop("烈焰1")
                 s.draw_card(s.board[posx][posy], posx, posy)
 
             for ind, (x, y, a, b, f) in enumerate(targets):
@@ -255,7 +255,7 @@ class BattleManager:
                 s.draw_card(hero, posx, posy, color_skill=["侵扰3"])
                 for ind in valid_ind[:3]:
                     s.draw_card(blue.card[ind], ind, -1, hightlight_dim=True, refresh=False, Type="Hand")
-                hero.skill.remove("侵扰3")
+                hero.skill.pop("侵扰3")
                 s.draw_card(hero, posx, posy)
 
             if "探索1" in hero.skill:
@@ -273,33 +273,37 @@ class BattleManager:
                                 break
                         red.pool[pool_ind], red.card[card_ind] = red.card[card_ind], red.pool[pool_ind]
                         red.pool.pop(pool_ind)
-                        hero.skill.remove("探索1")
+                        hero.skill.pop("探索1")
                         s.draw_card(red.card[card_ind], card_ind, -1, Type="Hand")
 
+        turn_over_card_pos = []
         for ind, (x, y, a, b, f) in enumerate(targets):
             if hero.name == "" or jinchang_flip:
                 break
-            tposx, tposy = -1, -1
-            # 寻找攻击目标时
-            # 优先级：洞穿-4，箭矢-5
-            if 0 <= posx + x and posx + x < s.height and \
-                    0 <= posy + y and posy + y < s.width and \
-                    s.board[posx + x][posy + y].name and \
-                    s.board[posx + x][posy + y].owner != s.board[posx][posy].owner:
-                if "护卫" in jinchang_skill:
-                    if s.order_owner[s.board[posx + x][posy + y].order] == s.board[posx][posy].owner:
+            if turn_over == False:
+                tposx, tposy = -1, -1
+                # 寻找攻击目标时
+                # 优先级：洞穿-4，箭矢-5
+                if 0 <= posx + x and posx + x < s.height and \
+                        0 <= posy + y and posy + y < s.width and \
+                        s.board[posx + x][posy + y].name and \
+                        s.board[posx + x][posy + y].owner != s.board[posx][posy].owner:
+                    if "护卫" in hero.skill and hero.skill["护卫"] == 1:
+                        if s.order_owner[s.board[posx + x][posy + y].order] == s.board[posx][posy].owner:
+                            tposx, tposy = posx + x, posy + y
+                    else:
                         tposx, tposy = posx + x, posy + y
-                else:
-                    tposx, tposy = posx + x, posy + y
-            
-            if "护卫" not in jinchang_skill and "箭矢" in hero.skill:
-                if 0 <= posx + 2 * x and posx + 2 * x < s.height and \
-                        0 <= posy + 2 * y and posy + 2 * y < s.width and \
-                        (s.board[posx + x][posy + y].name == "" or \
-                        s.board[posx + x][posy + y].owner == hero.owner) and \
-                        s.board[posx + 2 * x][posy + 2 * y].name and \
-                        s.board[posx + 2 * x][posy + 2 * y].owner != s.board[posx][posy].owner:
-                    tposx, tposy = posx + 2 * x, posy + 2 * y
+                
+                if ("护卫" not in hero.skill or hero.skill["护卫"] != 1) and "箭矢" in hero.skill:
+                    if 0 <= posx + 2 * x and posx + 2 * x < s.height and \
+                            0 <= posy + 2 * y and posy + 2 * y < s.width and \
+                            (s.board[posx + x][posy + y].name == "" or \
+                            s.board[posx + x][posy + y].owner == hero.owner) and \
+                            s.board[posx + 2 * x][posy + 2 * y].name and \
+                            s.board[posx + 2 * x][posy + 2 * y].owner != s.board[posx][posy].owner:
+                        tposx, tposy = posx + 2 * x, posy + 2 * y
+            else:
+                tposx, tposy = posx, posy
 
             if tposx == -1 or tposy == -1:
                 continue
@@ -308,55 +312,110 @@ class BattleManager:
             #s.stdscr.refresh()
             #s.stdscr.getch()
             if hero.dimentions[a] > target_hero.dimentions[b] or \
-                    ("洞穿" in hero.skill and hero.dimentions[a] > min(target_hero.dimentions)):
-                color_skill = ["洞穿"]
-                if "护卫" in jinchang_skill:
-                    color_skill.append("护卫")
-                else:
-                    color_skill.append("箭矢")
-                s.draw_card(hero, posx, posy, color_skill=color_skill);
-                # 进攻后
-                # 优先级：吞食-5，躲闪-10
-                if "吞食" in hero.skill:
-                    s.draw_card(hero, posx, posy, color_skill=["吞食"]);
-                    target_hero.clear()
-                    s.draw_card(target_hero, tposx, tposy);
-                elif "躲闪" in target_hero.skill and random.random() > 0.5:
-                    pass
-                # 翻面前
-                # 优先级：帷幕-3，坚韧1-5，损毁-6
-                elif "帷幕" in target_hero.skill and s.friend_surround(tposx, tposy) and target_hero.try_flip_num == 0:
-                    target_hero.try_flip_num = 1
-                elif "坚韧1" in target_hero.skill:
-                    s.draw_card(target_hero, tposx, tposy, color_skill=["坚韧1"]);
-                    target_hero.skill.remove("坚韧1")
-                elif "损毁" in target_hero.skill:
-                    s.draw_card(target_hero, tposx, tposy, color_skill=["损毁"]);
-                    target_hero.clear()
-                else:
-                    target_hero.owner = hero.owner
-                    target_hero.skill -= caidingji
-                    targets[ind][4] = 1
-                s.draw_card(target_hero, tposx, tposy, color_skill=["躲闪", "帷幕"]);
+                    ("洞穿" in hero.skill and hero.dimentions[a] > min(target_hero.dimentions)) or \
+                    turn_over == True:
+                attack_flag = False
+                if turn_over == False:
+                    color_skill = ["洞穿"]
+                    if "护卫" in hero.skill and hero.skill["护卫"] == 1:
+                        color_skill.append("护卫")
+                    else:
+                        color_skill.append("箭矢")
+                    s.draw_card(hero, posx, posy, color_skill=color_skill);
+                    # 进攻后
+                    # 优先级：吞食-5，躲闪-10
+                    if "吞食" in hero.skill:
+                        s.draw_card(hero, posx, posy, color_skill=["吞食"]);
+                        target_hero.clear()
+                        attack_flag = True
+                        s.draw_card(target_hero, tposx, tposy);
+                    elif "躲闪" in target_hero.skill and random.random() > 0.5:
+                        attack_flag = True
+                    s.draw_card(target_hero, tposx, tposy, color_skill=["躲闪"]);
+                
+                if attack_flag == False:
+                    # 翻面前
+                    # 优先级：帷幕-3，坚韧1-5，损毁-6
+                    if "帷幕" in target_hero.skill and s.friend_surround(tposx, tposy) and target_hero.skill["帷幕"] == 0:
+                        target_hero.skill["帷幕"] = 1
+                    elif "坚韧1" in target_hero.skill:
+                        s.draw_card(target_hero, tposx, tposy, color_skill=["坚韧1"]);
+                        target_hero.skill.pop("坚韧1")
+                    elif "损毁" in target_hero.skill:
+                        s.draw_card(target_hero, tposx, tposy, color_skill=["损毁"]);
+                        target_hero.clear()
+                    else:
+                        target_hero.owner = red.owner
+                        for cdj in caidingji:
+                            if cdj in target_hero.skill:
+                                target_hero.skill.pop(cdj)
+                        targets[ind][4] = 1
+                        turn_over_card_pos.append([tposx, tposy])
+                    if turn_over == True:
+                        return
+                    s.draw_card(target_hero, tposx, tposy, color_skill=["帷幕"]);
 
         # 翻面后
-        # 优先级：践踏-6，护卫-10
-        if not jinchang_flip and "践踏" in hero.skill:
-            s.draw_card(hero, posx, posy, color_skill=["践踏"]);
-            for x, y, a, b, f in targets:
-                if f:
-                    s.inference(red, blue, s.board[posx + x][posy + y], posx + x, posy + y, jinchang=False)
+        # 优先级：变节-2，连击-5，践踏-6，护卫-10
+        bianjie_turn_over_card_pos = copy.copy(turn_over_card_pos)
+        for x, y in bianjie_turn_over_card_pos:
+            for dx, dy in [[0, -1], [0, 1], [-1, 0], [1, 0]]:
+                tposx, tposy = x + dx, y + dy
+                if 0 <= tposx and tposx < s.height and \
+                        0 <= tposy and tposy < s.width and \
+                        s.board[tposx][tposy].name != "" and \
+                        s.board[tposx][tposy].owner != s.board[x][y].owner and \
+                        "变节" in s.board[tposx][tposy].skill:
+                    target_hero = s.board[tposx][tposy]
+                    s.draw_card(target_hero, tposx, tposy, color_skill=["变节"])
+                    tmp_res = [[0, 0, 0, 0, 0]]
+                    s.inference(red, blue, target_hero, tposx, tposy, jinchang=False, turn_over=True, assign_targets=tmp_res)
+                    if tmp_res[0][4]:
+                        bianjie_turn_over_card_pos.append([tposx, tposy])
+                    s.draw_card(target_hero, tposx, tposy, color_skill=["变节"])
+
+        if not jinchang_flip:
+            if "连击" in hero.skill and hero.skill['连击'] == 0:
+                hero.skill['连击'] = 1
+                s.draw_card(hero, posx, posy, color_skill=["连击"])
+                s.inference(red, blue, hero, posx, posy, jinchang=False)
+            
+            if "践踏" in hero.skill:
+                s.draw_card(hero, posx, posy, color_skill=["践踏"])
+                for x, y in turn_over_card_pos:
+                    if f:
+                        s.inference(red, blue, s.board[posx + x][posy + y], posx + x, posy + y, jinchang=False)
         
         if jinchang == True:
             ordered_hero = s.get_ordered_hero_on_board()
             for i, j, order in ordered_hero:
-                if "护卫" in s.board[i][j].skill:
+                if "护卫" in s.board[i][j].skill and s.board[i][j].skill["护卫"] == 0:
+                    s.board[i][j].skill["护卫"] = 1
                     if s.board[i][j].owner != red.owner:
-                        s.inference(blue, red, s.board[i][j], i, j, jinchang=False, jinchang_skill=set(["护卫"]))
+                        s.inference(blue, red, s.board[i][j], i, j, jinchang=False)
                     else:
-                        s.inference(red, blue, s.board[i][j], i, j, jinchang=False, jinchang_skill=set(["护卫"]))
-
+                        s.inference(red, blue, s.board[i][j], i, j, jinchang=False)
         
+    def compute_elo(s, red, blue, red_knt, blue_knt, equal_knt):
+        K = 20
+        Ered = 1 / (1 + 10 ** ((blue - red) / 400))
+        Eblue = 1 / (1 + 10 ** ((red - blue) / 400))
+        red_cards_num = s.get_card_num("Red")
+        blue_cards_num = s.get_card_num("Blue")
+        if red_cards_num > blue_cards_num:
+            Sred, Sblue = 1, 0
+            red_knt += 1
+            exit()
+        elif red_cards_num < blue_cards_num:
+            Sred, Sblue = 0, 1
+            blue_knt += 1
+        else:
+            Sred, Sblue = 0.5, 0.5
+            equal_knt += 1
+        red += K * (Sred - Ered)
+        blue += K * (Sblue - Eblue)
+        return red, blue, red_knt, blue_knt, equal_knt
+
     def show_winner(s):
         if s.stdscr == False:
             return
@@ -391,6 +450,15 @@ class BattleManager:
         for i in range(5):
             s.stdscr.addstr(7 + i * 7, 5, "-----------------------------")
             s.stdscr.addstr(7 + i * 7, 165, "-----------------------------")
+
+        for i in range(3):
+            s.stdscr.addstr(10 + i * 10, 48, str(i + 1))
+            s.stdscr.addstr(10 + i * 10, 145, str(i + 1))
+            s.stdscr.addstr(4, 65 + i * 30, str(i + 1))
+            s.stdscr.addstr(36, 65 + i * 30, str(i + 1))
+        for i in range(5):
+            s.stdscr.addstr(6 + 7 * i, 5, str(i + 1))
+            s.stdscr.addstr(6 + 7 * i, 165, str(i + 1))
 
         s.stdscr.attron(curses.A_BOLD)
         if s.turn == 0:
